@@ -1,0 +1,314 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Marimaker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
+  <script src="{{ url_for('serve_script', filename='spaceObject.js') }}"></script>
+  <script src="{{ url_for('serve_script', filename='colorControl.js') }}"></script>
+  <script src="{{ url_for('serve_script', filename='moveControl.js') }}"></script>
+  <style>
+    #canvasWrapper {
+      width: 100%;
+      max-width: 600px;
+      position: relative;
+      aspect-ratio: 1 / 1;
+    }
+
+    #canvas {
+      /* Base layout is 600x600; we scale it for small screens */
+      width: 600px;
+      height: 600px;
+      z-index: 5;
+      position: relative;
+      transform-origin: top left;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #inputs {
+      z-index: 4;
+      background-color: #f2f2f2;
+      padding: 5px;
+      width: 550px;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    #colorObjects {
+      display: flex;
+      align-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    #page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      #page {
+        grid-template-columns: 1fr;
+      }
+
+      #canvasWrapper {
+        margin-top: 12px;
+      }
+    }
+
+    select {
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+    }
+
+    select option {
+      margin: 40px;
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+    }
+
+    select option[value="magenta"] {
+      background: rgba(231, 38, 136, 0.7);
+    }
+
+    select option[value="yellow"] {
+      background: rgba(255, 205, 20, 0.7);
+    }
+
+    select option[value="cyan"] {
+      background: rgba(15, 207, 211, 0.7);
+    }
+
+    #optionsRet {
+      display: none;
+    }
+
+    #optionsImage {
+      display: block;
+    }
+
+    #optionsStar {
+      display: none;
+    }
+
+    #optionsShadow {
+      display: none;
+    }
+
+    img {
+      position: absolute;
+    }
+
+    #background {
+      z-index: 0;
+    }
+
+    #star {
+      z-index: 1;
+    }
+
+    #img {
+      z-index: 2;
+    }
+
+    #ret {
+      position: absolute;
+      z-index: 3;
+      width: 150px;
+      height: 60px;
+      background-color: rgba(231, 38, 136, 0.7);
+      border: none;
+      mix-blend-mode: color;
+      margin-top: 250px;
+      margin-left: 250px;
+    }
+
+    .filter-yellow {
+      filter: drop-shadow(-20px -7px rgba(250, 205, 20, 1)) drop-shadow(20px -7px rgba(250, 205, 20, 1));
+    }
+
+    .filter-magenta {
+      filter: drop-shadow(-20px -7px rgba(231, 38, 136, 1)) drop-shadow(20px -7px rgba(231, 38, 136, 1));
+    }
+
+    .filter-cyan {
+      filter: drop-shadow(-20px -7px rgba(15, 207, 211, 1)) drop-shadow(20px -7px rgba(15, 207, 211, 1));
+    }
+
+    input {
+      width: 100px;
+    }
+
+    * {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 12px;
+      background-color: #fcfcfc;
+    }
+
+    #img-shadow {
+      position: absolute;
+      z-index: 1;
+      opacity: 1;
+      mix-blend-mode: multiply;
+      transform: translate(-20px, -7px);
+    }
+  </style>
+</head>
+
+<body onload="selectMoveObject()">
+  <div id="page">
+    <div id=inputs>
+      COLORS
+      <div id="colorObjects"></div>
+      <div id="controlObjects">
+        <div id="changeOption">
+          Move
+          <select id="configs" onclick=selectMoveObject(value)>
+            <option value="Image" selected>Image</option>
+            <option value="Star">Star</option>
+            <option value="Rectangle">Rectangle</option>
+          </select>
+        </div>
+        <div id="moveObjectDiv"></div>
+      </div>
+    </div>
+    <div id="canvasWrapper">
+      <div id="canvas">
+        <img id="background" src="../assets/cyan_background.png" width="600" />
+        <img id="star" src="../assets/magenta_star.png" width="300" />
+        <img id="img-shadow" width="500">
+        <img id="img" class="filter-yellow" width="500" />
+        <img id="ret" />
+      </div>
+    </div>
+  </div>
+  <p>Você vai ter que printar a foto</p>
+  <p>Infelizmente, ainda não consegui achar uma maneira fácil de baixar a imagem :(</p>
+
+  <script>
+    function applyCanvasScale() {
+      const wrapper = document.getElementById('canvasWrapper');
+      const canvas = document.getElementById('canvas');
+      if (!wrapper || !canvas) return;
+
+      const baseSize = 600;
+      const availableWidth = wrapper.clientWidth;
+      const scale = Math.min(1, availableWidth / baseSize);
+
+      canvas.style.transform = `scale(${scale})`;
+    }
+
+    // Run immediately so the wrapper doesn't flash at 600x600
+    applyCanvasScale();
+    document.addEventListener('DOMContentLoaded', applyCanvasScale);
+    window.addEventListener('resize', applyCanvasScale);
+    window.addEventListener('load', applyCanvasScale);
+
+    //add the path of the image to the "img" object
+    thePath = window.location.href.split("/")[4];
+    document.getElementById("img").src = "../uploaded_images/" + thePath + ".png"
+    //create the location of the canvas objects
+    var star = new spaceObject(0, 0, 300);
+    var img = new spaceObject(0, 0, 500);
+    var ret = new spaceObject(250, 250, 100);
+    //arrays to avoid if statements (use in for loops)
+    var colors = ["magenta", "yellow", "cyan"];
+    var colorsCode = ["rgba(231,38,136,0.7)", "rgba(255,205,20,0.7)", "rgba(15,207,211,0.7)"];
+    var filters = ["filter-magenta", "filter-yellow", "filter-cyan"];
+    var options = ["optionsRet", "optionsImage", "optionsStar"];
+    var modes = ['x', 'y', 's'];
+    var sets = ["setX", "setY", "setSize"];
+    var cssStyle = ["marginLeft", "marginTop", "width"];
+    var gets = ["getX", "getY", "getSize"];
+
+    //useful variables
+    var imgCSS = document.getElementById("img").style;
+    var starCSS = document.getElementById("star").style;
+    var retCSS = document.getElementById("ret").style;
+
+    //colorControl Template
+    let colorControler = document.getElementById('colorObjects');
+    colorControler.innerHTML = htmlString;
+    //moveControl Template
+    let displacementDiv = document.getElementById('moveObjectDiv');
+    displacementDiv.innerHTML = objectDisplacement;
+
+    function colorSelect(object, value) {
+      var obj = document.getElementById(object).style.background = colorsCode[colors.indexOf(value)];
+      console.log(object, value);
+      var funcName = "turn" + object;
+      turnFunctions[funcName](value);
+    }
+
+    var turnFunctions = {
+      turnBackground: function (color) {
+        document.getElementById('background').src = '../assets/' + color + '_background.png';
+      },
+      turnStar: function (color) {
+        document.getElementById('star').src = '../assets/' + color + '_star.png';
+      },
+      turnRectangle: function (color) {
+        for (var i = 0; i < 3; i++)
+          if (colors[i] === color)
+            retCSS.backgroundColor = colorsCode[i];
+      },
+      turnShadow: function (color) {
+        for (var i = 0; i < 3; i++)
+          if (colors[i] === color)
+            document.getElementById('img').className = filters[i];
+      }
+    };
+
+    function selectMoveObject(value) {
+      if (!value)
+        value = "Image";
+      changeMoveObject(value);
+      let displacementDiv = document.getElementById('moveObjectDiv');
+      displacementDiv.innerHTML = objectDisplacement;
+    }
+
+    function starStyle(mode, amount) {
+      for (let i = 0; i < 3; i++) {
+        if (modes[i] == mode) {
+          star[sets[i]](amount);
+          starCSS[cssStyle[i]] = (star[gets[i]]().toString()) + "px"
+        }
+      }
+    }
+
+    function imageStyle(mode, amount) {
+      for (let i = 0; i < 3; i++) {
+        if (modes[i] == mode) {
+          img[sets[i]](amount);
+          imgCSS[cssStyle[i]] = (img[gets[i]]().toString()) + "px"
+        }
+      }
+    }
+
+    function retStyle(mode, amount) {
+      for (let i = 0; i < 2; i++) {
+        if (modes[i] == mode) {
+          ret[sets[i]](amount);
+          retCSS[cssStyle[i]] = (ret[gets[i]]().toString()) + "px"
+        }
+      }
+      if (mode == 's') {
+        ret.setSize(amount);
+        retCSS.height = ((ret.getSize() / 2.5).toString()) + "px";
+        retCSS.width = (ret.getSize().toString()) + "px";
+      }
+    }
+  </script>
+</body>
+
+</html>
