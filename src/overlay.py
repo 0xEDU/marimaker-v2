@@ -13,7 +13,7 @@ def do_the_trick(path, output_dir):
 	basewidth = 500
 	wpercent = (basewidth / float(img.size[0]))
 	hsize = int((float(img.size[1]) * float(wpercent)))
-	img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
+	img = img.resize((basewidth, hsize), Image.ANTIALIAS)
 
 	up_path = os.path.join(output_dir, f"{rand}_up.png")
 	res_path = os.path.join(output_dir, f"{rand}_res.png")
