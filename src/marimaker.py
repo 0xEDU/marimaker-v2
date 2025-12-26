@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 import os
+from pathlib import Path
 from overlay import do_the_trick
 
 app = Flask(__name__, static_url_path='/assets')
-app.config['UPLOAD_FOLDER'] = '../uploaded_images'
-app.config['ASSETS'] = './templates/assets'
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+app.config['UPLOAD_FOLDER'] = str(PROJECT_ROOT / 'uploaded_images')
+app.config['ASSETS'] = str(Path(__file__).resolve().parent / 'templates' / 'assets')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1000 * 1000
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
@@ -44,12 +46,14 @@ def base():
 			return redirect(request.url)
 		if file and allowed_file(file.filename):
 			filename = secure_filename(file.filename)
-		file_location = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+		else:
+			return redirect(request.url)
 		os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+		file_location = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 		file.save(file_location)
 		print(file_location)
 		# magic mike
-		path = do_the_trick(file_location)
+		path = do_the_trick(file_location, app.config['UPLOAD_FOLDER'])
 		# delete images
 		os.remove(file_location)
 		# call above route /uploads/name and redict user to access image

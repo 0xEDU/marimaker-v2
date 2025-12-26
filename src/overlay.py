@@ -1,29 +1,49 @@
-
 from PIL import Image, ImageEnhance
 import os
-from random import randrange
 import secrets
-import glob
+import subprocess
 
-def do_the_trick(path):
+
+def do_the_trick(path, output_dir):
+	os.makedirs(output_dir, exist_ok=True)
+
 	img = Image.open(path)
 
 	rand = secrets.token_hex(16)
 	basewidth = 500
-	wpercent = (basewidth/float(img.size[0]))
-	hsize = int((float(img.size[1])*float(wpercent)))
-	img = img.resize((basewidth,hsize), Image.Resampling.LANCZOS)
-	img.save("./uploaded_images/"+rand+"_up.png")
-	string = "backgroundremover -i " + "./uploaded_images/"+rand+"_up.png" + " -m "+ "u2net_human_seg" + " -o " + "./uploaded_images/"+rand+"_res.png"
-	os.system(string)
+	wpercent = (basewidth / float(img.size[0]))
+	hsize = int((float(img.size[1]) * float(wpercent)))
+	img = img.resize((basewidth, hsize), Image.Resampling.LANCZOS)
 
-	cropedImage = Image.open("./uploaded_images/"+rand+"_res.png")
+	up_path = os.path.join(output_dir, f"{rand}_up.png")
+	res_path = os.path.join(output_dir, f"{rand}_res.png")
+	final_path = os.path.join(output_dir, f"{rand}.png")
+
+	img.save(up_path)
+
+	# Remove background
+	subprocess.run(
+		[
+			"backgroundremover",
+			"-i",
+			up_path,
+			"-m",
+			"u2net_human_seg",
+			"-o",
+			res_path,
+		],
+		check=True,
+	)
+
+	cropedImage = Image.open(res_path)
 	converter = ImageEnhance.Color(cropedImage)
 	cropedImage = converter.enhance(0)
-	cropedImage.save("./uploaded_images/"+rand+".png")
+	cropedImage.save(final_path)
 
-	files = glob.glob('./uploaded_images/*_up.png') + glob.glob('./uploaded_images/*_res.png')
-	for file in files:
-		os.remove(file)
+	for tmp_path in (up_path, res_path):
+		try:
+			os.remove(tmp_path)
+		except FileNotFoundError:
+			pass
 
 	return rand
